@@ -15,10 +15,12 @@ class ContactsService:
         data = self.client.get(path)
         return ContactResponse.model_validate(data)
 
-    def list(self, page: int = 1, limit: int = 100, filters: Optional[Dict[str, Any]] = None) -> List[ContactResponse]:
+    def list(self, page: int = 1, limit: int = 10, filters: Optional[Dict[str, Any]] = None) -> List[ContactResponse]:
         params = {"page": page, "limit": limit}
+        
         if filters:
-            params.update(filters)
+            params.update(self.client.parse_filters(filters))
+        
         data = self.client.get("/contacts", params=params)
         # assume API returns a list; if wrapped, callers may need to adjust
         items = data if isinstance(data, list) else data.get("items", [])

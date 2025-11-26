@@ -1,6 +1,6 @@
 import time
 from typing import Any, Dict, Optional
-
+from urllib.parse import urlencode, quote
 import httpx
 
 from .errors import (
@@ -14,6 +14,15 @@ from .errors import (
 
 
 class OctadeskClient:
+
+    standard_fields = [
+        'name', 'email', 'organization.id', 'organizartion.name', 
+        'organization.domain', 'phoneContacts.number',
+        'responsible.name', 'responsible.email'
+    ]
+
+    operators = ["eq", "ne", "lt", "le", "gt", "ge", "in", "nin"]
+
     def __init__(
         self,
         api_key: str,
@@ -27,8 +36,9 @@ class OctadeskClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
-        self._client = httpx.Client(base_url=self.base_url, timeout=self.timeout)
+        self._client = httpx.Client(timeout=self.timeout, headers = self._default_headers)
 
+    @property
     def _default_headers(self) -> Dict[str, str]:
         return {
             "x-api-key": self.api_key,
@@ -67,13 +77,16 @@ class OctadeskClient:
         raise APIError(status_code=status, body=body)
 
     def _request(self, method: str, path: str, json: Optional[Dict] = None, params: Optional[Dict] = None) -> Any:
-        url = path if path.startswith("http") else path
-        headers = self._default_headers()
+        url = f"{self.base_url}{path}"
+
+        if params:
+            str_params = urlencode(params, safe = "[]", quote_via = quote)
+            url = f"{url}?{str_params}"
 
         last_exc = None
         for attempt in range(1, self.max_retries + 1):
             try:
-                response = self._client.request(method, url, headers=headers, json=json, params=params)
+                response = self._client.request(method, url, json=json)
             except httpx.RequestError as exc:
                 last_exc = exc
                 if attempt == self.max_retries:
@@ -95,6 +108,28 @@ class OctadeskClient:
 
         # If we exit loop unexpectedly
         raise last_exc or APIError(status_code=0, message="Unknown error")
+
+    def parse_filters(self, filters: Optional[Dict[str, Any]]) -> Dict[str, str]:
+        if not filters:
+            return {}
+        parsed = {}
+        counter = 0
+        for property, definition in filters.items():
+            
+            if property not in self.standard_fields:
+                property = f"customFields.{property}"
+
+            operator = "eq"
+            if isinstance(definition, str) or isinstance(definition, int):
+                value = definition
+            elif hasattr(definition, "__iter__"):
+                value, operator = definition
+                assert operator in self.operators, f"Invalid operator: {operator}"
+            
+            parsed[f"filters[{counter}][operator]"] = operator
+            parsed[f"filters[{counter}][property]"]= property
+            parsed[f"filters[{counter}][value]"] = value
+        return parsed
 
     def get(self, path: str, params: Optional[Dict] = None) -> Any:
         return self._request("GET", path, params=params)
