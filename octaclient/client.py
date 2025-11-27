@@ -125,7 +125,9 @@ class OctadeskClient:
             elif hasattr(definition, "__iter__"):
                 value, operator = definition
                 assert operator in self.operators, f"Invalid operator: {operator}"
-            
+            else:
+                raise ValueError("Value and/or operator could not be determined")
+ 
             parsed[f"filters[{counter}][operator]"] = operator
             parsed[f"filters[{counter}][property]"]= property
             parsed[f"filters[{counter}][value]"] = value
