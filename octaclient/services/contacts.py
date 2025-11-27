@@ -22,7 +22,6 @@ class ContactsService:
             params.update(self.client.parse_filters(filters))
         
         data = self.client.get("/contacts", params=params)
-        # assume API returns a list; if wrapped, callers may need to adjust
         items = data if isinstance(data, list) else data.get("items", [])
         return [ContactResponse.model_validate(i) for i in items]
 
@@ -31,14 +30,14 @@ class ContactsService:
         data = self.client.post("/contacts", json=payload)
         return ContactResponse.model_validate(data)
 
-    def update(self, contact_id: str, contact: ContactUpdate) -> ContactResponse:
+    def update(self, contact: ContactUpdate) -> ContactResponse:
         payload = contact.model_dump(exclude_none=True)
-        path = f"/contacts/{contact_id}"
+        path = f"/contacts/{contact.id}"
         data = self.client.patch(path, json=payload)
         return ContactResponse.model_validate(data)
     
-    def override(self, contact_id: str, contact: ContactOverride) -> ContactResponse:
+    def override(self, contact: ContactOverride) -> ContactResponse:
         payload = contact.model_dump(exclude_none=True)
-        path = f"/contacts/{contact_id}"
+        path = f"/contacts/{contact.id}"
         data = self.client.put(path, json=payload)
         return ContactResponse.model_validate(data)
